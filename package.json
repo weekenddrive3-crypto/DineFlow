@@ -1,0 +1,26 @@
+{
+  "name": "petpooja-pos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Restaurant POS Management System",
+  "scripts": {
+    "dev": "pnpm run --parallel dev",
+    "dev:frontend": "pnpm --filter frontend dev",
+    "dev:backend": "pnpm --filter backend dev",
+    "dev:desktop": "pnpm --filter desktop dev",
+    "build": "pnpm run --parallel build",
+    "build:frontend": "pnpm --filter frontend build",
+    "build:backend": "pnpm --filter backend build",
+    "build:desktop": "pnpm --filter desktop build",
+    "lint": "pnpm run --parallel lint",
+    "test": "pnpm run --parallel test",
+    "db:migrate": "pnpm --filter database migrate",
+    "db:generate": "pnpm --filter database generate",
+    "db:seed": "pnpm --filter database seed",
+    "db:studio": "pnpm --filter database studio"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

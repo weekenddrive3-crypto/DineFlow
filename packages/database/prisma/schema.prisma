@@ -1,0 +1,558 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// AUTH & USERS
+// ============================================
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  phone        String
+  passwordHash String
+  role         UserRole @default(BILLER)
+  outletId     String
+  outlet       Outlet   @relation(fields: [outletId], references: [id])
+  isActive     Boolean  @default(true)
+
+  // Relations
+  orders       Order[]   @relation("BillerOrders")
+  expenses     Expense[]
+  cashFlows    CashFlow[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([outletId])
+  @@index([email])
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  BILLER
+  CAPTAIN
+  KITCHEN
+}
+
+// ============================================
+// OUTLET / RESTAURANT
+// ============================================
+model Outlet {
+  id          String  @id @default(cuid())
+  name        String  // "LAVISH TOWN" from screenshot
+  refId       String  @unique // "R330747" / "A330747R" from screenshot
+  address     String
+  phone       String  // "07969 223344" from screenshot
+  gstNumber   String?
+  fssaiNumber String?
+  currency    String  @default("INR")
+  timezone    String  @default("Asia/Kolkata")
+  isActive    Boolean @default(true)
+
+  // Settings (stored as JSON for flexibility)
+  displaySettings     Json @default("{}")
+  calculationSettings Json @default("{}")
+  printSettings       Json @default("{}")
+  customerSettings    Json @default("{}")
+  onlineOrderSettings Json @default("{}")
+  billingSystemSettings Json @default("{}")
+
+  // Relations
+  users          User[]
+  areas          Area[]
+  menuCategories MenuCategory[]
+  menuItems      MenuItem[]
+  orders         Order[]
+  taxGroups      TaxGroup[]
+  customers      Customer[]
+  inventoryItems InventoryItem[]
+  expenses       Expense[]
+  cashFlows      CashFlow[]
+  discounts      Discount[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// MENU MANAGEMENT
+// ============================================
+model MenuCategory {
+  id       String @id @default(cuid())
+  name     String // "Hot Coffee", "Cold Coffee", "Tea", etc. from screenshot
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  items MenuItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([outletId])
+  @@unique([outletId, name])
+}
+
+model MenuItem {
+  id         String @id @default(cuid())
+  name       String // "Affogato Coffee", "Americano Coffee", etc. from screenshot
+  categoryId String
+  category   MenuCategory @relation(fields: [categoryId], references: [id])
+  outletId   String
+  outlet     Outlet @relation(fields: [outletId], references: [id])
+
+  shortCode  String?
+  price      Float
+  taxGroupId String?
+  taxGroup   TaxGroup? @relation(fields: [taxGroupId], references: [id])
+  foodType   FoodType  @default(VEG)
+  description String   @default("")
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+
+  // Relations
+  variants   MenuItemVariant[]
+  addons     MenuItemAddon[]
+  orderItems OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([outletId])
+}
+
+enum FoodType {
+  VEG
+  NON_VEG
+  EGG
+}
+
+model MenuItemVariant {
+  id         String   @id @default(cuid())
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  name       String
+  price      Float
+  isDefault  Boolean  @default(false)
+
+  @@index([menuItemId])
+}
+
+model MenuItemAddon {
+  id         String   @id @default(cuid())
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  name       String
+  price      Float
+  groupName  String   @default("Add-ons")
+  isRequired Boolean  @default(false)
+
+  @@index([menuItemId])
+}
+
+// ============================================
+// TABLE & AREA MANAGEMENT
+// ============================================
+model Area {
+  id       String @id @default(cuid())
+  name     String // "Nightindoor", "Outdoor" from screenshot
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  tables RestaurantTable[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([outletId])
+  @@unique([outletId, name])
+}
+
+model RestaurantTable {
+  id     String @id @default(cuid())
+  number Int    // 1, 2, 3... from screenshot
+  areaId String
+  area   Area   @relation(fields: [areaId], references: [id])
+
+  capacity   Int         @default(4)
+  status     TableStatus @default(BLANK)
+  occupiedAt DateTime?
+
+  // Current active order
+  currentOrderId String? @unique
+  currentOrder   Order?  @relation("TableCurrentOrder")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([areaId])
+  @@unique([areaId, number])
+}
+
+enum TableStatus {
+  BLANK
+  RUNNING
+  PRINTED
+  PAID
+  RUNNING_KOT
+}
+
+// ============================================
+// ORDERS
+// ============================================
+model Order {
+  id          String @id @default(cuid())
+  orderNumber Int    // 112, 113, 114... from screenshot
+  outletId    String
+  outlet      Outlet @relation(fields: [outletId], references: [id])
+
+  billNumber    Int
+  orderType     OrderType
+  orderStatus   OrderStatus @default(SAVED)
+
+  // Table info
+  tableId     String?  @unique
+  table       RestaurantTable? @relation("TableCurrentOrder", fields: [tableId], references: [id])
+  areaType    String?          // "Nightindoor", "Outdoor"
+
+  // Customer
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id])
+
+  // Biller
+  billerId    String
+  biller      User     @relation("BillerOrders", fields: [billerId], references: [id])
+  billerName  String   // "biller" from screenshot
+
+  // Amounts (matching Sales Report columns from screenshot)
+  subtotal        Float @default(0) // "My Amount" column
+  discount        Float @default(0)
+  deliveryCharge  Float @default(0)
+  containerCharge Float @default(0)
+  sgst            Float @default(0) // "SGST (A)" column
+  cgst            Float @default(0) // "CGST (A)" column
+  totalTax        Float @default(0)
+  total           Float @default(0) // "Total" column
+  roundOff        Float @default(0)
+  tip             Float @default(0)
+  totalWithTip    Float @default(0) // "Total + Tip" column
+
+  // Payment
+  paymentType   PaymentType   @default(NOT_PAID)
+  paymentStatus PaymentStatus @default(PENDING)
+
+  reason String? // "Reason" column from screenshot
+  notes  String  @default("")
+
+  // Relations
+  items    OrderItem[]
+  kots     KOT[]
+  payments Payment[]
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  printedAt  DateTime?
+  settledAt  DateTime?
+
+  @@index([outletId])
+  @@index([orderNumber])
+  @@index([createdAt])
+  @@index([orderStatus])
+  @@index([paymentType])
+}
+
+enum OrderType {
+  DINE_IN
+  DELIVERY
+  PICK_UP
+  ONLINE
+  OTHER
+}
+
+enum OrderStatus {
+  SAVED
+  PRINTED
+  CANCELLED
+  COMPLIMENTARY
+  SALES_RETURN
+}
+
+enum PaymentType {
+  CASH
+  CARD
+  UPI
+  DUE
+  OTHER
+  NOT_PAID
+  SPLIT
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  PARTIAL
+  REFUNDED
+}
+
+// ============================================
+// ORDER ITEMS
+// ============================================
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  menuItemId   String
+  menuItem     MenuItem @relation(fields: [menuItemId], references: [id])
+  menuItemName String
+  variantName  String?
+  quantity     Int
+  unitPrice    Float
+  totalPrice   Float
+  discount     Float    @default(0)
+  taxAmount    Float    @default(0)
+  notes        String   @default("")
+
+  kotId String?
+  kot   KOT?   @relation(fields: [kotId], references: [id])
+
+  addons OrderItemAddon[]
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@index([menuItemId])
+}
+
+model OrderItemAddon {
+  id          String    @id @default(cuid())
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  name        String
+  price       Float
+  quantity    Int       @default(1)
+}
+
+// ============================================
+// KOT (Kitchen Order Ticket)
+// ============================================
+model KOT {
+  id        String @id @default(cuid())
+  kotNumber Int
+  orderId   String
+  order     Order  @relation(fields: [orderId], references: [id])
+
+  status KOTStatus @default(PENDING)
+
+  items OrderItem[]
+
+  createdAt  DateTime  @default(now())
+  printedAt  DateTime?
+  acceptedAt DateTime?
+  readyAt    DateTime?
+
+  @@index([orderId])
+  @@index([status])
+}
+
+enum KOTStatus {
+  PENDING
+  ACCEPTED
+  PREPARING
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+// ============================================
+// TAX CONFIGURATION
+// ============================================
+model TaxGroup {
+  id       String @id @default(cuid())
+  name     String // e.g., "GST 5%", "GST 12%"
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+  isActive Boolean @default(true)
+
+  taxes     TaxRate[]
+  menuItems MenuItem[]
+
+  @@index([outletId])
+  @@unique([outletId, name])
+}
+
+model TaxRate {
+  id         String   @id @default(cuid())
+  taxGroupId String
+  taxGroup   TaxGroup @relation(fields: [taxGroupId], references: [id], onDelete: Cascade)
+  name       String   // "SGST", "CGST"
+  rate       Float    // 2.5 for 2.5%
+  type       TaxType
+
+  @@index([taxGroupId])
+}
+
+enum TaxType {
+  SGST
+  CGST
+  IGST
+  VAT
+  SERVICE_TAX
+}
+
+// ============================================
+// PAYMENTS
+// ============================================
+model Payment {
+  id            String        @id @default(cuid())
+  orderId       String
+  order         Order         @relation(fields: [orderId], references: [id])
+  amount        Float
+  method        PaymentType
+  transactionId String?
+  status        PaymentStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+}
+
+// ============================================
+// CUSTOMERS
+// ============================================
+model Customer {
+  id       String @id @default(cuid())
+  name     String
+  phone    String
+  email    String?
+  address  String?
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+
+  totalOrders Int   @default(0)
+  totalSpent  Float @default(0)
+  dueAmount   Float @default(0)
+  notes       String @default("")
+
+  orders Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([outletId])
+  @@index([phone])
+  @@unique([outletId, phone])
+}
+
+// ============================================
+// DISCOUNT
+// ============================================
+model Discount {
+  id       String @id @default(cuid())
+  name     String
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+
+  type     DiscountType
+  value    Float       // percentage or fixed amount
+  minOrder Float?      // minimum order for discount
+  isActive Boolean     @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([outletId])
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+// ============================================
+// INVENTORY
+// ============================================
+model InventoryItem {
+  id       String @id @default(cuid())
+  name     String
+  unit     String // "kg", "litre", "piece"
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+
+  currentStock Float
+  minStock     Float   @default(0)
+  costPerUnit  Float   @default(0)
+
+  lastRestockedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([outletId])
+}
+
+// ============================================
+// EXPENSES
+// ============================================
+model Expense {
+  id       String @id @default(cuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+
+  category    String
+  amount      Float
+  description String @default("")
+  date        DateTime
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([outletId])
+  @@index([date])
+}
+
+// ============================================
+// CASH FLOW
+// ============================================
+model CashFlow {
+  id       String @id @default(cuid())
+  outletId String
+  outlet   Outlet @relation(fields: [outletId], references: [id])
+
+  type         CashFlowType
+  amount       Float
+  description  String       @default("")
+  balanceAfter Float
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([outletId])
+  @@index([createdAt])
+}
+
+enum CashFlowType {
+  TOP_UP
+  WITHDRAWAL
+  SALE
+  EXPENSE
+  REFUND
+}

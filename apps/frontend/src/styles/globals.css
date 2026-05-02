@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   GLOBAL STYLES
+   ============================================ */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* ============================================
+   SCROLLBAR STYLING
+   ============================================ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+  background: #c4c4c4;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
+
+/* ============================================
+   CUSTOM UTILITY CLASSES
+   ============================================ */
+@layer components {
+  /* POS Button styles matching Petpooja design */
+  .btn-primary {
+    @apply bg-brand-red text-white px-4 py-2 rounded font-medium 
+           hover:bg-brand-darkRed transition-colors duration-150;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-gray-700 px-4 py-2 rounded font-medium 
+           border border-gray-300 hover:bg-gray-50 transition-colors duration-150;
+  }
+
+  .btn-success {
+    @apply bg-brand-green text-white px-4 py-2 rounded font-medium 
+           hover:opacity-90 transition-opacity duration-150;
+  }
+
+  /* Category sidebar item */
+  .category-item {
+    @apply px-3 py-3 text-sm font-medium cursor-pointer 
+           transition-colors duration-150 text-white;
+  }
+  .category-item.active {
+    @apply bg-brand-red;
+  }
+  .category-item:hover:not(.active) {
+    @apply bg-sidebar-hover;
+  }
+
+  /* Menu grid item */
+  .menu-item-card {
+    @apply border border-gray-200 rounded px-3 py-4 text-center 
+           cursor-pointer text-sm font-medium text-gray-700
+           hover:border-brand-green hover:shadow-sm 
+           transition-all duration-150 bg-white;
+  }
+
+  /* Table card */
+  .table-card {
+    @apply border-2 border-dashed rounded-lg p-4 min-h-[90px] 
+           flex flex-col items-center justify-center cursor-pointer 
+           transition-all duration-150 text-sm font-medium;
+  }
+}
