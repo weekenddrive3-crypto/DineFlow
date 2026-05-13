@@ -4,7 +4,8 @@
   "private": true,
   "description": "Restaurant POS Management System",
   "scripts": {
-    "dev": "pnpm run --parallel dev",
+    "postinstall": "prisma generate --schema=packages/database/prisma/schema.prisma",
+    "dev": "pnpm --filter frontend --filter backend run --parallel dev",
     "dev:frontend": "pnpm --filter frontend dev",
     "dev:backend": "pnpm --filter backend dev",
     "dev:desktop": "pnpm --filter desktop dev",
@@ -22,5 +23,11 @@
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.0.0"
+  },
+  "devDependencies": {
+    "prisma": "^6.0.0"
   }
 }
