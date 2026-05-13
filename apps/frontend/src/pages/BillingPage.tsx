@@ -3,8 +3,9 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Search, Utensils, User, ClipboardList, X, Plus, Minus, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useOrderStore } from '@/store/Order.store';
-import type { CartItem } from '@/store/Order.store'
+import type { CartItem } from '@/store/Order.store';
 import { useMenuStore } from '@/store/menu.store';
+import { printReceipt, printKOT } from '@/utils/printer';
 
 export default function BillingPage() {
   const [searchParams] = useSearchParams();
@@ -65,7 +66,6 @@ export default function BillingPage() {
     if (!tableNumber || cart.length === 0) {
       toast.error('Please add items first');
       return;
-      
     }
     toast.success(`Order saved for Table ${tableNumber} — ₹${total.toFixed(2)}`);
     navigate('/tables');
@@ -77,6 +77,16 @@ export default function BillingPage() {
       return;
     }
     setTableStatus(tableNumber, 'RUNNING_KOT');
+
+    // Print KOT
+    printKOT(
+      Math.floor(Math.random() * 9999),
+      tableNumber,
+      areaName,
+      cart.map((item) => ({ name: item.name, quantity: item.quantity })),
+      'Spicy Kitchen',
+    );
+
     toast.success(`KOT sent to kitchen for Table ${tableNumber}`);
   };
 
@@ -86,6 +96,37 @@ export default function BillingPage() {
       return;
     }
     setTableStatus(tableNumber, 'PRINTED');
+
+    // Print bill preview (not settled yet)
+    const subtotal = total;
+    const sgst = Math.round((subtotal * 2.5) / 100 * 100) / 100;
+    const cgst = Math.round((subtotal * 2.5) / 100 * 100) / 100;
+
+    printReceipt(
+      {
+        id: 'preview',
+        orderNumber: Date.now() % 10000,
+        tableNumber,
+        areaName,
+        orderType: 'dineIn',
+        items: [...cart],
+        subtotal,
+        sgst,
+        cgst,
+        total: subtotal + sgst + cgst,
+        paymentMethod: 'Not Paid',
+        billerName: 'biller',
+        createdAt: new Date(),
+        settledAt: new Date(),
+      },
+      {
+        restaurantName: 'Spicy Kitchen',
+        address: 'Bhubaneswar, Odisha',
+        phone: '9876543210',
+        footerText: 'Thank you for dining with us!',
+      },
+    );
+
     toast.success(`Bill printed for Table ${tableNumber} — ₹${total.toFixed(2)}`);
   };
 
@@ -99,13 +140,21 @@ export default function BillingPage() {
       return;
     }
 
-    // Settle the table — saves to completedOrders and clears the table
+    // Settle and save the order
     const completedOrder = settleTable(tableNumber, method);
 
     if (completedOrder) {
+      // Auto-print receipt
+      printReceipt(completedOrder, {
+        restaurantName: 'Spicy Kitchen',
+        address: 'Bhubaneswar, Odisha',
+        phone: '9876543210',
+        footerText: 'Thank you for dining with us!',
+      });
+
       toast.success(
         `Table ${tableNumber} settled!\nOrder #${completedOrder.orderNumber} — ${method} ₹${completedOrder.total.toFixed(2)}`,
-        { duration: 4000 }
+        { duration: 4000 },
       );
     }
 
@@ -325,7 +374,7 @@ export default function BillingPage() {
           </div>
 
           <div className="flex gap-1 p-2 bg-gray-50">
-            <button onClick={handleSave } className="btn-secondary text-xs flex-1 py-2">Save</button>
+            <button onClick={handleSave} className="btn-secondary text-xs flex-1 py-2">Save</button>
             <button onClick={handlePrint} className="bg-brand-red text-white text-xs flex-1 py-2 rounded">Save & Print</button>
             <button className="bg-orange-500 text-white text-xs flex-1 py-2 rounded">Save & EBill</button>
             <button onClick={handleKOT} className="bg-blue-600 text-white text-xs flex-1 py-2 rounded">KOT</button>
