@@ -19,9 +19,11 @@ async function bootstrap() {
   );
 
   // CORS
-  app.enableCors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+ app.enableCors({
+    origin: true,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   // Swagger API docs
